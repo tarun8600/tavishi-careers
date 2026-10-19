@@ -1,0 +1,1 @@
+import {NextResponse} from "next/server";import {jobs} from "../../../lib/demo-jobs";export async function GET(request:Request){const q=new URL(request.url).searchParams.get("query")?.toLowerCase().trim()??"";return NextResponse.json({jobs:jobs.filter(j=>`${j.title} ${j.company} ${j.location}`.toLowerCase().includes(q)),demo:true});}
