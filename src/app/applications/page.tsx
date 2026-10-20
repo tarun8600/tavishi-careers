@@ -14,6 +14,7 @@ type Application = {
   resume_id: string | null;
   status: string;
   created_at: string;
+  approved_at: string | null;
   jobs: {
     title: string;
     company: string;
@@ -67,7 +68,7 @@ export default function ApplicationsPage() {
         supabase
           .from("applications")
           .select(
-            "id,resume_id,status,created_at,jobs(title,company,location,description,apply_url),resumes(filename)"
+            "id,resume_id,status,created_at,approved_at,jobs(title,company,location,description,apply_url),resumes(filename)"
           )
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
@@ -133,7 +134,7 @@ export default function ApplicationsPage() {
     applicationId: string,
     action: "change_resume" | "withdraw"
   ) {
-    if (busyId) return;
+    if (busyId !== null) return;
 
     const application = applications.find(
       (item) => item.id === applicationId
@@ -227,6 +228,94 @@ export default function ApplicationsPage() {
     }
   }
 
+  async function approveApplication(applicationId: string) {
+    if (busyId !== null) return;
+
+    const application = applications.find(
+      (item) => item.id === applicationId
+    );
+
+    if (!application || application.status !== "draft") {
+      setMessage("Only draft applications can be approved.");
+      return;
+    }
+
+    if (!application.resume_id || !application.resumes) {
+      setMessage("Please select an uploaded resume first.");
+      return;
+    }
+
+    if (
+      selectedResumes[applicationId] !== application.resume_id
+    ) {
+      setMessage(
+        "You changed the resume selection. Save the resume change before approving."
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Approve this Tavishi Careers draft?\n\n` +
+        `Job: ${application.jobs?.title ?? "Unavailable"}\n` +
+        `Company: ${application.jobs?.company ?? "Unavailable"}\n` +
+        `Resume: ${application.resumes.filename}\n\n` +
+        "This records your approval in Tavishi Careers.\n" +
+        "It does NOT submit an application to an employer.\n\n" +
+        "The approved application cannot be edited as a draft.\n\n" +
+        "Select OK to approve."
+    );
+
+    if (!confirmed) return;
+
+    setBusyId(applicationId);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/applications/${applicationId}/approve`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(
+          result.error ??
+            "Unable to approve this application."
+        );
+        return;
+      }
+
+      setApplications((current) =>
+        current.map((item) =>
+          item.id === applicationId
+            ? {
+                ...item,
+                status: "approved",
+                approved_at: new Date().toISOString(),
+              }
+            : item
+        )
+      );
+
+      setMessage(
+        "Application approved successfully. No employer submission was performed."
+      );
+    } catch {
+      setMessage(
+        "Network error. Please refresh to check the status before trying again."
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <main
       style={{
@@ -242,11 +331,20 @@ export default function ApplicationsPage() {
         My Applications
       </h1>
 
-      <p>
-        Review, manage, and track your job applications.
-      </p>
+      <p>Review, manage, approve, and track your applications.</p>
 
-      {message && <p role="status">{message}</p>}
+      {message && (
+        <p
+          role="status"
+          style={{
+            background: "#eef4ff",
+            padding: 14,
+            borderRadius: 8,
+          }}
+        >
+          {message}
+        </p>
+      )}
 
       {loading ? (
         <p>Loading applications...</p>
@@ -266,6 +364,9 @@ export default function ApplicationsPage() {
 
             const isDraft =
               application.status === "draft";
+
+            const isApproved =
+              application.status === "approved";
 
             const isBusy =
               busyId === application.id;
@@ -301,7 +402,16 @@ export default function ApplicationsPage() {
 
                 <p>
                   Status:{" "}
-                  <strong style={{ textTransform: "capitalize" }}>
+                  <strong
+                    style={{
+                      color: isApproved
+                        ? "#067647"
+                        : application.status === "withdrawn"
+                          ? "#b42318"
+                          : "#10233f",
+                      textTransform: "capitalize",
+                    }}
+                  >
                     {application.status.replaceAll("_", " ")}
                   </strong>
                 </p>
@@ -312,6 +422,15 @@ export default function ApplicationsPage() {
                     application.created_at
                   ).toLocaleDateString()}
                 </p>
+
+                {application.approved_at && (
+                  <p>
+                    Approved:{" "}
+                    {new Date(
+                      application.approved_at
+                    ).toLocaleDateString()}
+                  </p>
+                )}
 
                 <button
                   type="button"
@@ -405,7 +524,7 @@ export default function ApplicationsPage() {
                             selectedResumes[application.id] ??
                             ""
                           }
-                          disabled={isBusy}
+                          disabled={busyId !== null}
                           onChange={(event) =>
                             setSelectedResumes((current) => ({
                               ...current,
@@ -452,7 +571,7 @@ export default function ApplicationsPage() {
                           }}
                         >
                           {isBusy
-                            ? "Saving..."
+                            ? "Processing..."
                             : "Save Resume Change"}
                         </button>
 
@@ -462,14 +581,55 @@ export default function ApplicationsPage() {
                           </a>
                         </p>
 
-                        <hr
+                        <hr style={dividerStyle}/>
+
+                        <h3>Approve Application</h3>
+
+                        <p>
+                          Confirm the job and selected resume
+                          before approving this draft.
+                        </p>
+
+                        <p>
+                          Approval records consent in Tavishi
+                          Careers. It does not submit an
+                          application to an employer.
+                        </p>
+
+                        <button
+                          type="button"
+                          disabled={
+                            busyId !== null ||
+                            !application.resume_id ||
+                            selectedResumes[
+                              application.id
+                            ] !== application.resume_id
+                          }
+                          onClick={() =>
+                            approveApplication(
+                              application.id
+                            )
+                          }
                           style={{
-                            border: 0,
-                            borderTop:
-                              "1px solid #dce3ed",
-                            margin: "24px 0",
+                            ...buttonStyle,
+                            background: "#067647",
                           }}
-                        />
+                        >
+                          {isBusy
+                            ? "Processing..."
+                            : "Approve Application"}
+                        </button>
+
+                        {selectedResumes[
+                          application.id
+                        ] !== application.resume_id && (
+                          <p>
+                            Save your resume change before
+                            approving.
+                          </p>
+                        )}
+
+                        <hr style={dividerStyle}/>
 
                         <h4>Withdraw Draft</h4>
 
@@ -496,6 +656,34 @@ export default function ApplicationsPage() {
                             ? "Processing..."
                             : "Withdraw Draft"}
                         </button>
+                      </div>
+                    ) : isApproved ? (
+                      <div
+                        style={{
+                          background: "#ecfdf3",
+                          padding: 20,
+                          border: "1px solid #abefc6",
+                          borderRadius: 10,
+                        }}
+                      >
+                        <h3 style={{ color: "#067647" }}>
+                          Application Approved
+                        </h3>
+
+                        <p>
+                          Your approval has been recorded
+                          in Tavishi Careers.
+                        </p>
+
+                        <p>
+                          This application is no longer
+                          editable as a draft.
+                        </p>
+
+                        <strong>
+                          No employer submission has been
+                          performed.
+                        </strong>
                       </div>
                     ) : (
                       <p>
@@ -558,4 +746,10 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 8,
   background: "white",
   color: "#10233f",
+};
+
+const dividerStyle: React.CSSProperties = {
+  border: 0,
+  borderTop: "1px solid #dce3ed",
+  margin: "24px 0",
 };
