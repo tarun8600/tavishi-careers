@@ -4,14 +4,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 
+type Resume = {
+  id: string;
+  filename: string;
+};
+
 type Application = {
   id: string;
+  resume_id: string | null;
   status: string;
   created_at: string;
   jobs: {
     title: string;
     company: string;
     location: string | null;
+    description: string | null;
+    apply_url: string | null;
   } | null;
   resumes: {
     filename: string;
@@ -29,50 +37,195 @@ export default function ApplicationsPage() {
   );
 
   const [applications, setApplications] = useState<Application[]>([]);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [selectedResumes, setSelectedResumes] = useState<
+    Record<string, string>
+  >({});
+
+  const [reviewId, setReviewId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    let active = true;
+
     async function load() {
       const {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser();
 
+      if (!active) return;
+
       if (authError || !user) {
         window.location.replace("/login");
         return;
       }
 
-      const { data, error } = await supabase
-        .from("applications")
-        .select(
-          "id,status,created_at,jobs(title,company,location),resumes(filename)"
-        )
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const [applicationResult, resumeResult] = await Promise.all([
+        supabase
+          .from("applications")
+          .select(
+            "id,resume_id,status,created_at,jobs(title,company,location,description,apply_url),resumes(filename)"
+          )
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
 
-      if (error) {
-        setMessage("Unable to load applications: " + error.message);
+        supabase
+          .from("resumes")
+          .select("id,filename")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (!active) return;
+
+      if (applicationResult.error) {
+        setMessage(
+          "Unable to load applications: " +
+            applicationResult.error.message
+        );
       } else {
-        const normalized = (data ?? []).map((item) => ({
-          ...item,
-          jobs: Array.isArray(item.jobs)
-            ? item.jobs[0] ?? null
-            : item.jobs,
-          resumes: Array.isArray(item.resumes)
-            ? item.resumes[0] ?? null
-            : item.resumes,
-        }));
+        const normalized = (applicationResult.data ?? []).map(
+          (item) => ({
+            ...item,
+            jobs: Array.isArray(item.jobs)
+              ? item.jobs[0] ?? null
+              : item.jobs,
+            resumes: Array.isArray(item.resumes)
+              ? item.resumes[0] ?? null
+              : item.resumes,
+          })
+        ) as Application[];
 
-        setApplications(normalized as Application[]);
+        setApplications(normalized);
+
+        const initialSelections: Record<string, string> = {};
+
+        normalized.forEach((application) => {
+          initialSelections[application.id] =
+            application.resume_id ?? "";
+        });
+
+        setSelectedResumes(initialSelections);
+      }
+
+      if (resumeResult.error) {
+        setMessage(
+          "Unable to load resumes: " + resumeResult.error.message
+        );
+      } else {
+        setResumes(resumeResult.data ?? []);
       }
 
       setLoading(false);
     }
 
     void load();
+
+    return () => {
+      active = false;
+    };
   }, [supabase]);
+
+  async function updateDraft(
+    applicationId: string,
+    action: "change_resume" | "withdraw"
+  ) {
+    if (busyId) return;
+
+    const application = applications.find(
+      (item) => item.id === applicationId
+    );
+
+    if (!application || application.status !== "draft") {
+      setMessage("Only draft applications can be changed.");
+      return;
+    }
+
+    const resumeId = selectedResumes[applicationId];
+
+    if (action === "change_resume" && !resumeId) {
+      setMessage("Please select a resume.");
+      return;
+    }
+
+    if (action === "withdraw") {
+      const confirmed = window.confirm(
+        "Withdraw this draft application? You will not be able to edit it afterward."
+      );
+
+      if (!confirmed) return;
+    }
+
+    setBusyId(applicationId);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/applications/${applicationId}`,
+        {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action,
+            ...(action === "change_resume"
+              ? { resumeId }
+              : {}),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(
+          result.error ?? "Unable to update application."
+        );
+        return;
+      }
+
+      if (action === "withdraw") {
+        setApplications((current) =>
+          current.map((item) =>
+            item.id === applicationId
+              ? { ...item, status: "withdrawn" }
+              : item
+          )
+        );
+
+        setMessage("Application draft withdrawn successfully.");
+      } else {
+        const newResume = resumes.find(
+          (item) => item.id === resumeId
+        );
+
+        setApplications((current) =>
+          current.map((item) =>
+            item.id === applicationId
+              ? {
+                  ...item,
+                  resume_id: resumeId,
+                  resumes: newResume
+                    ? { filename: newResume.filename }
+                    : null,
+                }
+              : item
+          )
+        );
+
+        setMessage("Application resume updated successfully.");
+      }
+    } catch {
+      setMessage("Network error. Please try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <main
@@ -85,73 +238,324 @@ export default function ApplicationsPage() {
     >
       <a href="/dashboard">← Back to Dashboard</a>
 
-      <h1>My Applications</h1>
-      <p>Track your job applications in one place.</p>
+      <h1 style={{ color: "#10233f" }}>
+        My Applications
+      </h1>
 
-      {message && <p role="alert">{message}</p>}
+      <p>
+        Review, manage, and track your job applications.
+      </p>
+
+      {message && <p role="status">{message}</p>}
 
       {loading ? (
         <p>Loading applications...</p>
       ) : applications.length === 0 ? (
-        <section
-          style={{
-            background: "white",
-            padding: 30,
-            border: "1px solid #dce3ed",
-            borderRadius: 12,
-          }}
-        >
+        <section style={cardStyle}>
           <h2>No applications yet</h2>
           <p>
-            Once you create your first job application,
-            it will appear here.
+            Create your first application draft from the Jobs page.
           </p>
           <a href="/jobs">Explore Jobs →</a>
         </section>
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
-          {applications.map((application) => (
-            <article
-              key={application.id}
-              style={{
-                background: "white",
-                padding: 24,
-                borderRadius: 12,
-                border: "1px solid #dce3ed",
-              }}
-            >
-              <h2>
-                {application.jobs?.title ?? "Unavailable Job"}
-              </h2>
-              <p>
-                <strong>
-                  {application.jobs?.company ?? "Unknown company"}
-                </strong>
-              </p>
-              <p>
-                Location:{" "}
-                {application.jobs?.location ?? "Not specified"}
-              </p>
-              <p>
-                Resume:{" "}
-                {application.resumes?.filename ?? "Not selected"}
-              </p>
-              <p>
-                Status:{" "}
-                <strong>
-                  {application.status.replaceAll("_", " ")}
-                </strong>
-              </p>
-              <p>
-                Created:{" "}
-                {new Date(
-                  application.created_at
-                ).toLocaleDateString()}
-              </p>
-            </article>
-          ))}
+          {applications.map((application) => {
+            const isReviewing =
+              reviewId === application.id;
+
+            const isDraft =
+              application.status === "draft";
+
+            const isBusy =
+              busyId === application.id;
+
+            return (
+              <article
+                key={application.id}
+                style={cardStyle}
+              >
+                <h2 style={{ color: "#10233f" }}>
+                  {application.jobs?.title ??
+                    "Unavailable Job"}
+                </h2>
+
+                <p>
+                  <strong>
+                    {application.jobs?.company ??
+                      "Unknown company"}
+                  </strong>
+                </p>
+
+                <p>
+                  Location:{" "}
+                  {application.jobs?.location ??
+                    "Not specified"}
+                </p>
+
+                <p>
+                  Resume:{" "}
+                  {application.resumes?.filename ??
+                    "Not selected"}
+                </p>
+
+                <p>
+                  Status:{" "}
+                  <strong style={{ textTransform: "capitalize" }}>
+                    {application.status.replaceAll("_", " ")}
+                  </strong>
+                </p>
+
+                <p>
+                  Created:{" "}
+                  {new Date(
+                    application.created_at
+                  ).toLocaleDateString()}
+                </p>
+
+                <button
+                  type="button"
+                  style={buttonStyle}
+                  aria-expanded={isReviewing}
+                  onClick={() =>
+                    setReviewId(
+                      isReviewing ? null : application.id
+                    )
+                  }
+                >
+                  {isReviewing
+                    ? "Close Review"
+                    : "Review Application"}
+                </button>
+
+                {isReviewing && (
+                  <section
+                    style={{
+                      marginTop: 24,
+                      padding: 20,
+                      background: "#f4f7fb",
+                      border: "1px solid #dce3ed",
+                      borderRadius: 10,
+                    }}
+                  >
+                    <h3>Application Review</h3>
+
+                    <p>
+                      <strong>Job:</strong>{" "}
+                      {application.jobs?.title ??
+                        "Unavailable"}
+                    </p>
+
+                    <p>
+                      <strong>Company:</strong>{" "}
+                      {application.jobs?.company ??
+                        "Unavailable"}
+                    </p>
+
+                    <p>
+                      <strong>Location:</strong>{" "}
+                      {application.jobs?.location ??
+                        "Not specified"}
+                    </p>
+
+                    <h4>Job Description</h4>
+
+                    <p
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      {application.jobs?.description ??
+                        "No description available."}
+                    </p>
+
+                    <h4>Selected Resume</h4>
+
+                    <p>
+                      {application.resumes?.filename ??
+                        "No resume selected"}
+                    </p>
+
+                    {isDraft ? (
+                      <div
+                        style={{
+                          background: "white",
+                          padding: 20,
+                          border: "1px solid #dce3ed",
+                          borderRadius: 10,
+                        }}
+                      >
+                        <h3>Manage Draft</h3>
+
+                        <label
+                          htmlFor={`resume-${application.id}`}
+                          style={{
+                            display: "block",
+                            fontWeight: 600,
+                            marginBottom: 10,
+                          }}
+                        >
+                          Change Resume
+                        </label>
+
+                        <select
+                          id={`resume-${application.id}`}
+                          value={
+                            selectedResumes[application.id] ??
+                            ""
+                          }
+                          disabled={isBusy}
+                          onChange={(event) =>
+                            setSelectedResumes((current) => ({
+                              ...current,
+                              [application.id]:
+                                event.target.value,
+                            }))
+                          }
+                          style={inputStyle}
+                        >
+                          <option value="">
+                            Select a resume
+                          </option>
+
+                          {resumes.map((resume) => (
+                            <option
+                              key={resume.id}
+                              value={resume.id}
+                            >
+                              {resume.filename}
+                            </option>
+                          ))}
+                        </select>
+
+                        <button
+                          type="button"
+                          disabled={
+                            busyId !== null ||
+                            !selectedResumes[
+                              application.id
+                            ] ||
+                            selectedResumes[
+                              application.id
+                            ] === application.resume_id
+                          }
+                          onClick={() =>
+                            updateDraft(
+                              application.id,
+                              "change_resume"
+                            )
+                          }
+                          style={{
+                            ...buttonStyle,
+                            marginTop: 14,
+                          }}
+                        >
+                          {isBusy
+                            ? "Saving..."
+                            : "Save Resume Change"}
+                        </button>
+
+                        <p style={{ marginTop: 22 }}>
+                          <a href="/resumes">
+                            Upload Another Resume →
+                          </a>
+                        </p>
+
+                        <hr
+                          style={{
+                            border: 0,
+                            borderTop:
+                              "1px solid #dce3ed",
+                            margin: "24px 0",
+                          }}
+                        />
+
+                        <h4>Withdraw Draft</h4>
+
+                        <p>
+                          Withdraw this draft if you no
+                          longer want to continue with it.
+                        </p>
+
+                        <button
+                          type="button"
+                          disabled={busyId !== null}
+                          onClick={() =>
+                            updateDraft(
+                              application.id,
+                              "withdraw"
+                            )
+                          }
+                          style={{
+                            ...buttonStyle,
+                            background: "#b42318",
+                          }}
+                        >
+                          {isBusy
+                            ? "Processing..."
+                            : "Withdraw Draft"}
+                        </button>
+                      </div>
+                    ) : (
+                      <p>
+                        This application's current status
+                        is{" "}
+                        <strong>
+                          {application.status.replaceAll(
+                            "_",
+                            " "
+                          )}
+                        </strong>
+                        . It cannot be edited using
+                        the draft controls.
+                      </p>
+                    )}
+
+                    <p style={{ marginTop: 20 }}>
+                      <strong>Submission:</strong>{" "}
+                      This review page does not send
+                      applications to employers.
+                    </p>
+                  </section>
+                )}
+              </article>
+            );
+          })}
         </div>
       )}
+
+      <p style={{ marginTop: 30 }}>
+        <a href="/jobs">Explore More Jobs →</a>
+      </p>
     </main>
   );
 }
+
+const cardStyle: React.CSSProperties = {
+  background: "white",
+  padding: 24,
+  borderRadius: 12,
+  border: "1px solid #dce3ed",
+};
+
+const buttonStyle: React.CSSProperties = {
+  background: "#155a91",
+  color: "white",
+  border: "none",
+  borderRadius: 8,
+  padding: "12px 20px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const inputStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  boxSizing: "border-box",
+  padding: 12,
+  border: "1px solid #cbd5e1",
+  borderRadius: 8,
+  background: "white",
+  color: "#10233f",
+};
