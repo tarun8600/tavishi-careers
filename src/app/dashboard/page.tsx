@@ -60,16 +60,90 @@ export default function DashboardPage() {
           ["Saved Jobs", "View your bookmarked jobs"],
           ["My Applications", "Track application progress"]
         ].map(([title, description]) => (
-          <article key={title} style={{
-            background: "white",
-            padding: 25,
-            border: "1px solid #dce3ed",
-            borderRadius: 12
-          }}>
-            <h2 style={{ fontSize: 20 }}>{title}</h2>
-            <p>{description}</p>
-            <small>Coming soon</small>
-          </article>
+          
+<article
+  key={title}
+  style={{
+    background: "white",
+    padding: 25,
+    border: "1px solid #dce3ed",
+    borderRadius: 12,
+  }}
+>
+  <h2 style={{ fontSize: 20 }}>{title}</h2>
+  <p>{description}</p>
+
+  {title === "My Profile" ? (
+    <a
+      href="/profile"
+      style={{
+        display: "inline-block",
+        marginTop: 10,
+        padding: "10px 16px",
+        background: "#155e95",
+        color: "white",
+        borderRadius: 8,
+        textDecoration: "none",
+      }}
+    >
+      View My Profile →
+    
+</a>
+) : title === "My Resumes" ? (
+  <a
+    href="/resumes"
+    style={{
+      display: "inline-block",
+      marginTop: 10,
+      padding: "10px 16px",
+      background: "#155e95",
+      color: "white",
+      borderRadius: 8,
+      textDecoration: "none",
+    }}
+  >
+    Manage My Resumes →
+  
+</a>
+) : title === "Saved Jobs" ? (
+  <a
+    href="/saved-jobs"
+    style={{
+      display: "inline-block",
+      marginTop: 10,
+      padding: "10px 16px",
+      background: "#155e95",
+      color: "white",
+      borderRadius: 8,
+      textDecoration: "none",
+    }}
+  >
+    View Saved Jobs →
+  
+</a>
+) : title === "My Applications" ? (
+  <a
+    href="/applications"
+    style={{
+      display: "inline-block",
+      marginTop: 10,
+      padding: "10px 16px",
+      background: "#155e95",
+      color: "white",
+      borderRadius: 8,
+      textDecoration: "none",
+    }}
+  >
+    View My Applications →
+  </a>
+) : (
+  <small>Coming soon</small>
+)}
+
+
+
+</article>
+
         ))}
       </section>
 
