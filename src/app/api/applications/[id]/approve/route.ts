@@ -29,7 +29,7 @@ export async function POST(
 
     if (!UUID_PATTERN.test(id)) {
       return NextResponse.json(
-        { error: "Invalid application ID" },
+        { error: "Please enter Valid Application ID" },
         { status: 400 }
       );
     }
