@@ -1,2 +1,32 @@
+
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
-export default function RootLayout({children}:{children:ReactNode}){return <html lang="en"><body style={{fontFamily:"Arial,sans-serif",margin:"2rem auto",maxWidth:1000,padding:"0 1rem",background:"#f7f9fc",color:"#16233b"}}><header><strong>Tavishi Careers</strong><nav style={{float:"right"}}><a href="/">Home</a> &nbsp; <a href="/jobs">Jobs</a></nav></header><hr/>{children}<footer style={{marginTop:60}}>Tavishi Careers · Prototype</footer></body></html>}
+
+export const metadata: Metadata = {
+  title: "Tavishi Careers",
+  description:
+    "Discover job opportunities across the United States.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body
+        style={{
+          margin: 0,
+          padding: 0,
+          minHeight: "100vh",
+          background: "#f7f9fc",
+          color: "#16233b",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        {children}
+      </body>
+    </html>
+  );
+}
