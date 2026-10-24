@@ -14,11 +14,14 @@ alter table public.jobs add column if not exists salary_currency text check (sal
 alter table public.jobs add column if not exists salary_period text check (salary_period is null or salary_period in ('hour','day','month','year'));
 alter table public.jobs add column if not exists posted_at timestamptz;
 alter table public.jobs add column if not exists source text;
-alter table public.jobs add column if not exists source_job_id text;
+alter table public.jobs add column if not exists external_job_id text; -- already used by the Greenhouse importer
+alter table public.jobs add column if not exists first_seen_at timestamptz;
+alter table public.jobs add column if not exists last_seen_at timestamptz;
 
 create index if not exists jobs_active_country_posted_idx on public.jobs (country_code, posted_at desc) where is_active;
 create index if not exists jobs_active_workplace_idx on public.jobs (workplace_type) where is_active;
 create index if not exists jobs_active_employment_idx on public.jobs (employment_type) where is_active;
 create index if not exists jobs_active_seniority_idx on public.jobs (seniority) where is_active;
 create index if not exists jobs_active_salary_idx on public.jobs (salary_currency, salary_max) where is_active;
-create unique index if not exists jobs_source_unique_idx on public.jobs (source, source_job_id) where source is not null and source_job_id is not null;
+-- Dedup key. Creation fails safely (no data change) if duplicates already exist; resolve those first.
+create unique index if not exists jobs_source_unique_idx on public.jobs (source, external_job_id) where source is not null and external_job_id is not null;
