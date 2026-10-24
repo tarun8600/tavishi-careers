@@ -8,3 +8,4 @@
 - F3 started: Supabase SSR auth + Google OAuth + profile onboarding (branch `feature/auth-profile`).
 - Findings: `saved_jobs` table used by UI but missing from migrations; build prerender fails without env vars; PR #1 adds `.idea/` files and deletes package-lock entries (needs review before any merge).
 - Added FEATURE_PARITY.md and DESIGN_SPEC.md (owner permanent requirements); roadmap F21–F26 added; design foundation F21 prioritized next.
+- Owner priority: roadmap restructured into 4 phases (website → QA/security → environments → monitoring); ACCEPTANCE_CRITERIA.md added. F21 design system applied app-wide (PR #30); screenshots in /workspace/screens. Starting F4/F22 worldwide job search.
