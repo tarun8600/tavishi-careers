@@ -1,198 +1,54 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { JobCard, type Job } from "@/components/jobs/JobCard";
+import { EmptyState, Skeleton } from "@/components/ui";
 
-type SavedJob = {
-  user_id: string;
-  job_id: string;
-  created_at: string;
-  jobs: {
-    id: string;
-    title: string;
-    company: string;
-    location: string | null;
-    description: string | null;
-    apply_url: string | null;
-  } | null;
-};
+const JOB_COLS = "id,title,company,location,country_code,city,workplace_type,employment_type,seniority,industry,salary_min,salary_max,salary_currency,salary_period,apply_url,posted_at,created_at";
 
 export default function SavedJobsPage() {
-  const supabase = useMemo(
-    () =>
-      createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-      ),
-    []
-  );
-
-  const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
+  const router = useRouter();
+  const supabase = useMemo(() => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!), []);
   const [userId, setUserId] = useState("");
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    async function load() {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        window.location.replace("/login");
-        return;
-      }
-
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return router.replace("/login?next=/saved-jobs");
       setUserId(user.id);
-
-      const { data, error } = await supabase
-        .from("saved_jobs")
-        .select(
-          "user_id,job_id,created_at,jobs(id,title,company,location,description,apply_url)"
-        )
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        setMessage("Unable to load saved jobs: " + error.message);
-      } else {
-        // Supabase can type embedded relationships as arrays.
-        // Normalize them to a single job object.
-        const normalized = (data ?? []).map((item) => ({
-          ...item,
-          jobs: Array.isArray(item.jobs)
-            ? item.jobs[0] ?? null
-            : item.jobs,
-        }));
-
-        setSavedJobs(normalized as SavedJob[]);
-      }
-
+      const { data, error } = await supabase.from("saved_jobs").select(`created_at, jobs(${JOB_COLS})`).eq("user_id", user.id).order("created_at", { ascending: false });
+      if (error) setMessage("Unable to load saved jobs.");
+      const list = (data ?? []).map((r: { jobs: unknown }) => (Array.isArray(r.jobs) ? r.jobs[0] : r.jobs)).filter(Boolean) as Job[];
+      setJobs(list);
       setLoading(false);
-    }
+    })();
+  }, [supabase, router]);
 
-    void load();
-  }, [supabase]);
-
-  async function removeJob(jobId: string) {
-    if (!userId || busyId) return;
-
+  async function unsave(jobId: string) {
     setBusyId(jobId);
-    setMessage("");
-
-    const { error } = await supabase
-      .from("saved_jobs")
-      .delete()
-      .eq("user_id", userId)
-      .eq("job_id", jobId);
-
-    if (error) {
-      setMessage("Unable to remove job: " + error.message);
-    } else {
-      setSavedJobs((current) =>
-        current.filter((item) => item.job_id !== jobId)
-      );
-      setMessage("Job removed from saved jobs.");
-    }
-
-    setBusyId("");
-  }
-
-  if (loading) {
-    return <div style={{ padding: 40 }}>Loading saved jobs...</div>;
+    const { error } = await supabase.from("saved_jobs").delete().eq("user_id", userId).eq("job_id", jobId);
+    if (error) setMessage("Unable to remove job.");
+    else setJobs((c) => c.filter((j) => j.id !== jobId));
+    setBusyId(null);
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 950,
-        margin: "40px auto",
-        padding: 24,
-        
-      }}
-    >
-      <a href="/dashboard">← Back to Dashboard</a>
-
-      <h1>Saved Jobs</h1>
-      <p>Manage the job opportunities you&apos;ve bookmarked.</p>
-
-      {message && <p role="status">{message}</p>}
-
-      {savedJobs.length === 0 ? (
-        <section
-          style={{
-            background: "white",
-            padding: 30,
-            borderRadius: 12,
-            border: "1px solid var(--border)",
-          }}
-        >
-          <h2>No saved jobs yet</h2>
-          <p>Browse job listings and save opportunities you like.</p>
-          <a href="/jobs">Explore Jobs →</a>
-        </section>
-      ) : (
-        <div style={{ display: "grid", gap: 16 }}>
-          {savedJobs.map((saved) => (
-            <article
-              key={saved.job_id}
-              style={{
-                background: "white",
-                padding: 24,
-                borderRadius: 12,
-                border: "1px solid var(--border)",
-              }}
-            >
-              <h2>
-                {saved.jobs?.title ?? "Unavailable Job"}
-              </h2>
-
-              <p style={{ fontWeight: 700 }}>
-                {saved.jobs?.company ?? "Unknown Company"}
-              </p>
-
-              <p>
-                📍 {saved.jobs?.location ?? "Not specified"}
-              </p>
-
-              <p>{saved.jobs?.description}</p>
-
-              {saved.jobs?.apply_url && (
-                <p>
-                  <a
-                    href={saved.jobs.apply_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open application ↗
-                  </a>
-                </p>
-              )}
-
-              <button
-                type="button"
-                disabled={busyId !== ""}
-                onClick={() => removeJob(saved.job_id)}
-                style={{
-                  background: "var(--primary-strong)",
-                  color: "white",
-                  padding: "10px 18px",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              >
-                {busyId === saved.job_id
-                  ? "Removing..."
-                  : "Remove Saved Job"}
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
+    <div style={{ display: "grid", gap: 24 }}>
+      <section className="tc-hero">
+        <h1>Saved jobs</h1>
+        <p style={{ margin: 0, color: "var(--text-muted)" }}>Roles you bookmarked, ready when you are.</p>
+      </section>
+      {message && <p role="status" className="tc-badge tc-tone-peach">{message}</p>}
+      {loading ? <div className="tc-card"><Skeleton /></div>
+        : jobs.length === 0 ? <EmptyState title="Nothing saved yet" body="Save jobs from search to compare them here." action={<Link href="/jobs" className="tc-btn tc-btn-primary">Search jobs</Link>} />
+        : jobs.map((j) => <JobCard key={j.id} job={j} saved busy={busyId === j.id} onSave={() => unsave(j.id)} onDraft={() => router.push(`/jobs?q=${encodeURIComponent(j.title)}`)} />)}
     </div>
   );
 }

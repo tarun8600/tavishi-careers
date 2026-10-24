@@ -13,3 +13,4 @@
 - F3 (#4) on `feature/auth-profile` (PR #23): SSR auth middleware, safe redirects, onboarding, /api/profile, migration 002 (not applied).
 - F21 design system applied app-wide on `feature/design-system` (PR #30).
 - F4/F22 worldwide job search on `feature/job-search` (PR #31): filters, /api/jobs, JobCard/SearchFilters, migration 003 (not applied). 30/30 tests.
+- F5/F8 on `feature/saved-jobs`: resumes page (labels, default, signed-URL downloads, validation lib), saved-jobs page with JobCard, migration 004 (saved_jobs + RLS, resume metadata, private 5 MB PDF/DOCX bucket with owner-folder policy; not applied). 36/36 tests.
