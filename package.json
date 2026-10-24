@@ -1,1 +1,29 @@
-{"name":"tavishi-careers","version":"0.1.0","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start","lint":"eslint"},"dependencies":{"@supabase/ssr":"^0.12.7","@supabase/supabase-js":"^2.118.0","next":"^15.5.0","react":"^19.1.0","react-dom":"^19.1.0"},"devDependencies":{"@types/node":"^22.0.0","@types/react":"^19.0.0","@types/react-dom":"^19.0.0","typescript":"^5.9.0"}}
+{
+  "name": "tavishi-careers",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "node --test tests/",
+    "dev:config": "node scripts/start-with-config.mjs --profile dev --mode dev",
+    "qa:build": "node scripts/start-with-config.mjs --profile qa --mode build",
+    "prod:build": "node scripts/start-with-config.mjs --profile prod --mode build",
+    "prod:start": "node scripts/start-with-config.mjs --profile prod --mode start"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.9.0"
+  }
+}
