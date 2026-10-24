@@ -1,90 +1,31 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { applyJobFilters, parseJobFilters, PAGE_SIZE, type FilterableQuery } from "@/lib/jobs/filters";
+
+type JobsResult = { data: unknown[] | null; error: { code?: string } | null; count: number | null };
+interface JobsQuery extends FilterableQuery<JobsQuery>, PromiseLike<JobsResult> {}
+
+const JOB_COLUMNS =
+  "id,title,company,location,country_code,city,workplace_type,employment_type,seniority,industry,salary_min,salary_max,salary_currency,salary_period,apply_url,posted_at,created_at";
 
 export async function GET(request: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return NextResponse.json({ error: "Service unavailable", jobs: [] }, { status: 503 });
+
+  const filters = parseJobFilters(request.nextUrl.searchParams);
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      }
-    );
-
-    const searchParams = request.nextUrl.searchParams;
-
-    const query = (searchParams.get("query") ?? "")
-      .trim()
-      .slice(0, 100);
-
-    const location = (searchParams.get("location") ?? "")
-      .trim()
-      .slice(0, 100);
-
-    let jobQuery = supabase
-      .from("jobs")
-      .select(
-        "id,title,company,location,description,apply_url,created_at"
-      )
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (query) {
-      const safeQuery = query.replace(/[(),]/g, " ").trim();
-
-      if (safeQuery) {
-        jobQuery = jobQuery.or(
-          `title.ilike.%${safeQuery}%,company.ilike.%${safeQuery}%`
-        );
-      }
-    }
-
-    if (location) {
-      const safeLocation = location
-        .replace(/[%_]/g, "")
-        .trim();
-
-      if (safeLocation) {
-        jobQuery = jobQuery.ilike(
-          "location",
-          `%${safeLocation}%`
-        );
-      }
-    }
-
-    const { data, error } = await jobQuery;
-
+    // Publishable key + RLS: only active jobs are readable.
+    const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const base = supabase.from("jobs").select(JOB_COLUMNS, { count: "exact" }) as unknown as JobsQuery;
+    const query = applyJobFilters(base, filters);
+    const { data, error, count } = await query;
     if (error) {
-      console.error("Jobs API error:", error.message);
-
-      return NextResponse.json(
-        {
-          error: "Unable to load jobs",
-          jobs: [],
-        },
-        { status: 500 }
-      );
+      console.error("Jobs API error:", error.code);
+      return NextResponse.json({ error: "Unable to load jobs", jobs: [] }, { status: 500 });
     }
-
-    return NextResponse.json({
-      jobs: data ?? [],
-      demo: false,
-      count: data?.length ?? 0,
-    });
-  } catch (error) {
-    console.error("Jobs API failure:", error);
-
-    return NextResponse.json(
-      {
-        error: "Unable to process jobs request",
-        jobs: [],
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ jobs: data ?? [], total: count ?? 0, page: filters.page, pageSize: PAGE_SIZE, filters });
+  } catch {
+    return NextResponse.json({ error: "Unable to process jobs request", jobs: [] }, { status: 500 });
   }
 }

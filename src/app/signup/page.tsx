@@ -65,7 +65,7 @@ async function handleGoogleSignup() {
   }
 
   return (
-    <main style={{ maxWidth: 440, margin: "60px auto", padding: 20 }}>
+    <div className="tc-card" style={{ maxWidth: 440, margin: "40px auto", padding: 28 }}>
       <h1>Create your account</h1>
       <p>Join Tavishi Careers and start your job search.</p>
 
@@ -78,8 +78,8 @@ async function handleGoogleSignup() {
     padding: "14px",
     marginBottom: "20px",
     background: "white",
-    color: "#10233f",
-    border: "1px solid #cbd5e1",
+    color: "var(--text)",
+    border: "1px solid var(--border)",
     borderRadius: "8px",
     fontWeight: 600,
     cursor: "pointer",
@@ -125,7 +125,7 @@ async function handleGoogleSignup() {
       <p>
         Already registered? <Link href="/login">Sign In</Link>
       </p>
-    </main>
+    </div>
   );
 }
 
@@ -135,12 +135,12 @@ const inputStyle: React.CSSProperties = {
   padding: 12,
   marginTop: 8,
   boxSizing: "border-box",
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--border)",
   borderRadius: 8,
 };
 
 const buttonStyle: React.CSSProperties = {
-  background: "#155a91",
+  background: "var(--primary-strong)",
   color: "white",
   padding: 14,
   border: "none",
