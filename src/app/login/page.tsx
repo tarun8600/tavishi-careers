@@ -136,7 +136,7 @@ async function handleGoogleLogin() {
       {message && <p role="alert">{message}</p>}
 
       <p>
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Link href="/signup">Create Account</Link>
       </p>
     </main>
