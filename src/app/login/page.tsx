@@ -23,7 +23,7 @@ async function handleGoogleLogin() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(new URLSearchParams(window.location.search).get("next") ?? "/dashboard")}`,
       },
     });
 
@@ -65,13 +65,13 @@ async function handleGoogleLogin() {
   }
 
   return (
-    <main style={{
+    <div style={{
       maxWidth: 440,
       margin: "60px auto",
       padding: 25,
       background: "white",
-      borderRadius: 12,
-      border: "1px solid #dce3ed",
+      borderRadius: "var(--r-lg)", boxShadow: "var(--shadow-1)",
+      border: "1px solid var(--border)",
     }}>
       <h1>Welcome Back</h1>
       <p>Sign in to your Tavishi Careers account.</p>
@@ -85,8 +85,8 @@ async function handleGoogleLogin() {
     padding: "14px",
     marginBottom: "20px",
     background: "white",
-    color: "#10233f",
-    border: "1px solid #cbd5e1",
+    color: "var(--text)",
+    border: "1px solid var(--border)",
     borderRadius: "8px",
     fontWeight: 600,
     cursor: "pointer",
@@ -136,10 +136,10 @@ async function handleGoogleLogin() {
       {message && <p role="alert">{message}</p>}
 
       <p>
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Link href="/signup">Create Account</Link>
       </p>
-    </main>
+    </div>
   );
 }
 
@@ -149,12 +149,12 @@ const inputStyle: React.CSSProperties = {
   padding: 12,
   marginTop: 8,
   boxSizing: "border-box",
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--border)",
   borderRadius: 8,
 };
 
 const buttonStyle: React.CSSProperties = {
-  background: "#155a91",
+  background: "var(--primary-strong)",
   color: "white",
   padding: 14,
   border: "none",

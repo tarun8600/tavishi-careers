@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { timingSafeEqual } from "node:crypto";
+import { bearerMatches, currentAdminId } from "@/lib/admin/auth";
 
 export const runtime = "nodejs";
 
@@ -13,18 +13,6 @@ type GreenhouseJob = {
   absolute_url: string;
   content?: string;
 };
-
-function authorized(received: string | null, secret: string) {
-  if (!received || !secret) return false;
-
-  const actual = Buffer.from(received);
-  const expected = Buffer.from(`Bearer ${secret}`);
-
-  return (
-    actual.length === expected.length &&
-    timingSafeEqual(actual, expected)
-  );
-}
 
 // Decode HTML entities, including nested encoded content.
 function decodeEntities(value: string) {
@@ -112,13 +100,11 @@ function cleanDescription(html: string) {
 export async function POST(request: NextRequest) {
   const secret = process.env.ADMIN_IMPORT_SECRET;
 
-  if (
-    !secret ||
-    !authorized(
-      request.headers.get("authorization"),
-      secret
-    )
-  ) {
+  // Automation may use the bearer secret; people must be signed-in admins (role-based, F16).
+  const viaSecret = bearerMatches(request.headers.get("authorization"), secret);
+  const origin = request.headers.get("origin");
+  const viaAdmin = !viaSecret && (!origin || origin === request.nextUrl.origin) && (await currentAdminId()) !== null;
+  if (!viaSecret && !viaAdmin) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401 }
