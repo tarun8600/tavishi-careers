@@ -12,3 +12,4 @@
 - CI workflow live on chore/ci-and-roadmap (ba5f063); merged into stacked branches. F4/F22 job search pushed (PR #31).
 - F3 (#4) on `feature/auth-profile` (PR #23): SSR auth middleware, safe redirects, onboarding, /api/profile, migration 002 (not applied).
 - F21 design system applied app-wide on `feature/design-system` (PR #30).
+- F4/F22 worldwide job search on `feature/job-search` (PR #31): filters, /api/jobs, JobCard/SearchFilters, migration 003 (not applied). 30/30 tests.
