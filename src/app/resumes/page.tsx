@@ -1,290 +1,109 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
-
-type Resume = {
-  id: string;
-  filename: string;
-  storage_path: string;
-  created_at: string;
-};
+import { EmptyState, Field, ResumeCard, Skeleton, type ResumeRow } from "@/components/ui";
+import { checkResumeFile, cleanLabel, resumeStoragePath } from "@/lib/resumes/validate";
 
 const BUCKET = "resumes";
-const MAX_SIZE = 5 * 1024 * 1024;
-
-const ALLOWED_TYPES = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
+const COLS = "id, filename, label, size_bytes, is_default, created_at, storage_path";
+type Row = ResumeRow & { storage_path: string };
 
 export default function ResumesPage() {
-  const supabase = useMemo(
-    () =>
-      createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-      ),
-    []
-  );
-
+  const router = useRouter();
+  const supabase = useMemo(() => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!), []);
   const [userId, setUserId] = useState("");
-  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [resumes, setResumes] = useState<Row[]>([]);
   const [file, setFile] = useState<File | null>(null);
+  const [label, setLabel] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    async function load() {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        window.location.replace("/login");
-        return;
-      }
-
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return router.replace("/login?next=/resumes");
       setUserId(user.id);
-
-      const { data, error } = await supabase
-        .from("resumes")
-        .select("id, filename, storage_path, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) setMessage(error.message);
-      else setResumes(data ?? []);
-
+      const { data, error } = await supabase.from("resumes").select(COLS).eq("user_id", user.id).order("created_at", { ascending: false });
+      if (error) setMessage("Unable to load resumes.");
+      setResumes((data as Row[]) ?? []);
       setLoading(false);
-    }
+    })();
+  }, [supabase, router]);
 
-    void load();
-  }, [supabase]);
-
-  async function uploadResume() {
-    if (!userId || !file || busy) return;
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setMessage("Please select a PDF or DOCX file.");
-      return;
-    }
-
-    if (file.size > MAX_SIZE || file.size === 0) {
-      setMessage("Resume must be between 1 byte and 5 MB.");
-      return;
-    }
-
-    setBusy(true);
-    setMessage("");
-
+  async function upload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file || !userId) return;
+    const check = checkResumeFile(file);
+    if (!check.ok) return setMessage(check.error);
+    setBusy(true); setMessage("");
     const id = crypto.randomUUID();
-    const extension =
-      file.type === "application/pdf" ? "pdf" : "docx";
-    const path = `${userId}/${id}.${extension}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, file, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      setMessage("Upload failed: " + uploadError.message);
-      setBusy(false);
-      return;
-    }
-
-    const { data, error: dbError } = await supabase
-      .from("resumes")
-      .insert({
-        id,
-        user_id: userId,
-        filename: file.name,
-        storage_path: path,
-      })
-      .select("id, filename, storage_path, created_at")
-      .single();
-
-    if (dbError) {
-      await supabase.storage.from(BUCKET).remove([path]);
-      setMessage("Unable to save resume record: " + dbError.message);
-    } else if (data) {
-      setResumes((current) => [data, ...current]);
-      setFile(null);
-      const picker = document.getElementById(
-        "resume-file"
-      ) as HTMLInputElement | null;
-      if (picker) picker.value = "";
-      setMessage("Resume uploaded successfully!");
-    }
-
-    setBusy(false);
-  }
-
-  async function downloadResume(resume: Resume) {
-    setMessage("");
-
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .download(resume.storage_path);
-
+    const path = resumeStoragePath(userId, id, check.ext);
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+    if (upErr) { setBusy(false); return setMessage("Upload failed. Please try again."); }
+    const { data, error } = await supabase.from("resumes")
+      .insert({ id, user_id: userId, filename: file.name.slice(0, 200), storage_path: path, label: cleanLabel(label), mime_type: file.type, size_bytes: file.size, is_default: resumes.length === 0 })
+      .select(COLS).single();
     if (error || !data) {
-      setMessage("Download failed: " + (error?.message ?? "Unknown error"));
-      return;
-    }
-
-    const url = URL.createObjectURL(data);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = resume.filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  async function deleteResume(resume: Resume) {
-    if (!window.confirm(`Delete "${resume.filename}"?`)) return;
-
-    setBusy(true);
-    setMessage("");
-
-    // Delete the database record before removing the file.
-    const { data, error: dbError } = await supabase
-      .from("resumes")
-      .delete()
-      .eq("id", resume.id)
-      .eq("user_id", userId)
-      .select("id");
-
-    if (dbError || !data?.length) {
-      setMessage(
-        "Unable to delete resume record: " +
-          (dbError?.message ?? "Resume not found")
-      );
-      setBusy(false);
-      return;
-    }
-
-    const { error: storageError } = await supabase.storage
-      .from(BUCKET)
-      .remove([resume.storage_path]);
-
-    if (storageError) {
-      setMessage(
-        "Resume record deleted, but file cleanup failed: " +
-          storageError.message
-      );
+      await supabase.storage.from(BUCKET).remove([path]);
+      setMessage("Unable to save the resume record.");
     } else {
-      setMessage("Resume deleted successfully.");
+      setResumes((c) => [data as Row, ...c]); setFile(null); setLabel(""); setMessage("Resume uploaded.");
+      const picker = document.getElementById("resume-file") as HTMLInputElement | null;
+      if (picker) picker.value = "";
     }
-
-    setResumes((current) =>
-      current.filter((item) => item.id !== resume.id)
-    );
     setBusy(false);
   }
 
-  if (loading) {
-    return <main style={{ padding: 40 }}>Loading resumes...</main>;
+  async function download(r: Row) {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(r.storage_path, 60);
+    if (error || !data) return setMessage("Download failed.");
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function makeDefault(r: Row) {
+    setBusy(true);
+    await supabase.from("resumes").update({ is_default: false }).eq("user_id", userId).neq("id", r.id);
+    const { error } = await supabase.from("resumes").update({ is_default: true }).eq("id", r.id).eq("user_id", userId);
+    if (error) setMessage("Unable to update default resume.");
+    else setResumes((c) => c.map((x) => ({ ...x, is_default: x.id === r.id })));
+    setBusy(false);
+  }
+
+  async function remove(r: Row) {
+    if (!window.confirm(`Delete "${r.label ?? r.filename}"? This cannot be undone.`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.from("resumes").delete().eq("id", r.id).eq("user_id", userId).select("id");
+    if (error || !data?.length) { setBusy(false); return setMessage("Unable to delete. Resumes used by an application cannot be removed."); }
+    const { error: sErr } = await supabase.storage.from(BUCKET).remove([r.storage_path]);
+    setMessage(sErr ? "Resume deleted, but file cleanup failed." : "Resume deleted.");
+    setResumes((c) => c.filter((x) => x.id !== r.id));
+    setBusy(false);
   }
 
   return (
-    <main
-      style={{
-        maxWidth: 800,
-        margin: "40px auto",
-        padding: 24,
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <a href="/dashboard">← Back to Dashboard</a>
-      <h1>My Resumes</h1>
-      <p>Upload and manage your resumes securely.</p>
-
-      <section
-        style={{
-          background: "white",
-          padding: 24,
-          border: "1px solid #dce3ed",
-          borderRadius: 12,
-          marginBottom: 24,
-        }}
-      >
-        <h2>Upload Resume</h2>
-        <p>PDF or DOCX only, maximum 5 MB.</p>
-        <input
-          id="resume-file"
-          type="file"
-          accept=".pdf,.docx"
-          onChange={(event) =>
-            setFile(event.target.files?.[0] ?? null)
-          }
-          disabled={busy}
-        />
-        <button
-          type="button"
-          onClick={uploadResume}
-          disabled={!file || busy}
-          style={{
-            display: "block",
-            marginTop: 18,
-            padding: "12px 20px",
-            background: "#155e95",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-            cursor: busy ? "wait" : "pointer",
-          }}
-        >
-          {busy ? "Please wait..." : "Upload Resume"}
-        </button>
+    <div style={{ display: "grid", gap: 24 }}>
+      <section className="tc-hero">
+        <h1>Your resumes</h1>
+        <p style={{ margin: 0, color: "var(--text-muted)" }}>Keep a resume for each career path. Files are private to your account.</p>
       </section>
-
-      <h2>Uploaded Resumes</h2>
-
-      {resumes.length === 0 ? (
-        <p>No resumes uploaded yet.</p>
-      ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {resumes.map((resume) => (
-            <article
-              key={resume.id}
-              style={{
-                padding: 18,
-                border: "1px solid #dce3ed",
-                borderRadius: 10,
-                background: "white",
-              }}
-            >
-              <strong>{resume.filename}</strong>
-              <p>
-                Uploaded:{" "}
-                {new Date(resume.created_at).toLocaleDateString()}
-              </p>
-              <button
-                onClick={() => downloadResume(resume)}
-                disabled={busy}
-              >
-                Download
-              </button>{" "}
-              <button
-                onClick={() => deleteResume(resume)}
-                disabled={busy}
-              >
-                Delete
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {message && <p role="status">{message}</p>}
-    </main>
+      <form onSubmit={upload} className="tc-card" style={{ display: "grid", gap: 4, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", alignItems: "end" }}>
+        <Field label="Resume file" hint="PDF or DOCX, up to 5 MB">
+          <input id="resume-file" type="file" accept=".pdf,.docx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        </Field>
+        <Field label="Label (optional)" hint="e.g. Data Engineering">
+          <input value={label} maxLength={80} onChange={(e) => setLabel(e.target.value)} />
+        </Field>
+        <div className="tc-field"><button type="submit" className="tc-btn tc-btn-primary" disabled={!file || busy}>{busy ? "Working…" : "Upload resume"}</button></div>
+      </form>
+      {message && <p role="status" className="tc-badge tc-tone-sky">{message}</p>}
+      {loading ? <div className="tc-card"><Skeleton /></div>
+        : resumes.length === 0 ? <EmptyState title="No resumes yet" body="Upload your first resume to start preparing applications." />
+        : <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+            {resumes.map((r) => <ResumeCard key={r.id} resume={r} busy={busy} onDownload={() => download(r)} onDelete={() => remove(r)} onDefault={() => makeDefault(r)} />)}
+          </div>}
+    </div>
   );
 }
