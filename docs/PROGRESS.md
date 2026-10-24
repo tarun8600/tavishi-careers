@@ -7,3 +7,4 @@
 - F2: CI workflow written (push blocked: token lacks `workflow` scope, B10), roadmap, progress log, blockers; GitHub issues per feature.
 - F3 started: Supabase SSR auth + Google OAuth + profile onboarding (branch `feature/auth-profile`).
 - Findings: `saved_jobs` table used by UI but missing from migrations; build prerender fails without env vars; PR #1 adds `.idea/` files and deletes package-lock entries (needs review before any merge).
+- F3 (#4) implemented on `feature/auth-profile`: SSR server client, middleware session refresh + protected-route redirect, open-redirect-safe `next`, onboarding page, `/api/profile` GET/PUT (session-derived id, validation, RLS), migration `002_profile_onboarding.sql` (additive, not applied). Lint/typecheck pass, 14/14 tests, build pass.

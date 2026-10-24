@@ -5,8 +5,8 @@ Prioritized by dependency → security → correctness → product value. Each f
 | # | Feature | Depends on | Status | Acceptance (testable) |
 |---|---------|-----------|--------|------------------------|
 | F1 | Infisical cloud configuration (PR #2) | – | ✅ | Six vars validated before start; missing names listed, never values; DEV/QA/PROD separate; local→cloud fallback; node:test suite |
-| F2 | CI + roadmap + lint | F1 | 🚧 | GitHub Actions runs lint, typecheck, test, build on push/PR |
-| F3 | Supabase SSR auth, Google OAuth, profile onboarding | F2 | 🚧 | Middleware refreshes session; protected routes redirect to /login; safe `next` redirect; profile validation tests; profile API upserts own row only |
+| F2 | CI + roadmap + lint | F1 | ⛔ (workflow scope) | GitHub Actions runs lint, typecheck, test, build on push/PR |
+| F3 | Supabase SSR auth, Google OAuth, profile onboarding | F2 | ✅ | Middleware refreshes session; protected routes redirect to /login; safe `next` redirect; profile validation tests; profile API upserts own row only |
 | F4 | Worldwide job schema + search filters | F2 | ⏳ | Country, city, remote/hybrid/onsite, salary min/max+currency, seniority, employment type; filter parser unit tests; indexed queries |
 | F5 | Multiple resumes + secure uploads | F3 | ⏳ | Private Storage bucket, per-user path RLS, MIME/size validation (PDF/DOCX ≤5 MB), signed URLs, delete own only |
 | F6 | Authorized job ingestion (Greenhouse, Lever, Ashby public boards) | F4 | ⏳ | Only employer-published board APIs; source+provenance stored; admin-secret protected; no fabricated jobs |

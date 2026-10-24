@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test tests/",
+    "test": "node --import tsx --test tests/*.test.mjs tests/*.test.ts",
     "dev:config": "node scripts/start-with-config.mjs --profile dev --mode dev",
     "qa:build": "node scripts/start-with-config.mjs --profile qa --mode build",
     "prod:build": "node scripts/start-with-config.mjs --profile prod --mode build",
@@ -28,6 +28,7 @@
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.28",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.0"
   }
 }
