@@ -1,567 +1,151 @@
-
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { filtersToQuery, parseJobFilters, PAGE_SIZE, type JobFilters } from "@/lib/jobs/filters";
+import { countryName, WORLDWIDE } from "@/lib/design/countries";
+import { SearchFilters } from "@/components/jobs/SearchFilters";
+import { JobCard, type Job } from "@/components/jobs/JobCard";
+import { EmptyState, Skeleton } from "@/components/ui";
 
-type Job = {
-  id: string;
-  title: string;
-  company: string;
-  location: string | null;
-  description: string | null;
-  apply_url: string | null;
-};
+type Resume = { id: string; filename: string };
 
-type Resume = {
-  id: string;
-  filename: string;
-};
-
-export default function Jobs() {
-  const supabase = useMemo(
-    () =>
-      createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-      ),
-    []
-  );
-
+function JobsInner() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [filters, setFilters] = useState<JobFilters>(() => parseJobFilters(params));
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  const [search, setSearch] = useState("");
-  const [location, setLocation] = useState("");
-  const [workplace, setWorkplace] = useState("all");
-
-  const [selectedResumeId, setSelectedResumeId] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [resumeId, setResumeId] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [draftBusyId, setDraftBusyId] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [message, setMessage] = useState("");
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    return url && key ? createBrowserClient(url, key) : null;
+  }, []);
 
-  // Load available jobs, user bookmarks and resumes.
+  // Load the signed-in user's saved jobs and resumes (RLS restricts to own rows).
   useEffect(() => {
-    let active = true;
-
-    async function load() {
-      const { data: jobData, error: jobError } = await supabase
-        .from("jobs")
-        .select(
-          "id,title,company,location,description,apply_url"
-        )
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
-
-      if (!active) return;
-
-      if (jobError) {
-        setMessage("Unable to load jobs: " + jobError.message);
-      } else {
-        setJobs(jobData ?? []);
-      }
-
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (!active) return;
-
-      if (!authError && user) {
-        setUserId(user.id);
-
-        // Load saved job IDs.
-        const { data: saved, error: savedError } =
-          await supabase
-            .from("saved_jobs")
-            .select("job_id")
-            .eq("user_id", user.id);
-
-        if (!active) return;
-
-        if (savedError) {
-          setMessage(
-            "Unable to load saved jobs: " + savedError.message
-          );
-        } else {
-          setSavedIds(
-            (saved ?? []).map((item) => item.job_id)
-          );
-        }
-
-        // Load the user's previously uploaded resumes.
-        const {
-          data: userResumes,
-          error: resumeError,
-        } = await supabase
-          .from("resumes")
-          .select("id,filename")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-
-        if (!active) return;
-
-        if (resumeError) {
-          setMessage(
-            "Unable to load resumes: " + resumeError.message
-          );
-        } else {
-          setResumes(userResumes ?? []);
-
-          if (userResumes?.length) {
-            setSelectedResumeId(userResumes[0].id);
-          }
-        }
-      }
-
-      setLoading(false);
-    }
-
-    void load();
-
-    return () => {
-      active = false;
-    };
+    if (!supabase) return;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setUserId(user.id);
+      const [saved, res] = await Promise.all([
+        supabase.from("saved_jobs").select("job_id").eq("user_id", user.id),
+        supabase.from("resumes").select("id,filename").eq("user_id", user.id).order("created_at", { ascending: false }),
+      ]);
+      setSavedIds((saved.data ?? []).map((r: { job_id: string }) => r.job_id));
+      setResumes(res.data ?? []);
+      if (res.data?.[0]) setResumeId(res.data[0].id);
+    })();
   }, [supabase]);
 
-  // Search and filter jobs.
-  const filteredJobs = useMemo(() => {
-    const query = search.toLowerCase().trim();
-    const place = location.toLowerCase().trim();
+  // Fetch real jobs from the API whenever filters change (debounced); keep URL shareable.
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      const qs = filtersToQuery(filters);
+      router.replace(qs ? `/jobs?${qs}` : "/jobs", { scroll: false });
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/jobs?${qs}`);
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error);
+        setJobs(body.jobs); setTotal(body.total); setMessage("");
+      } catch {
+        setJobs([]); setTotal(0); setMessage("Jobs could not be loaded right now. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }, 250);
+  }, [filters, router]);
 
-    return jobs.filter((job) => {
-      const text = [
-        job.title,
-        job.company,
-        job.description ?? "",
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      const jobLocation = (job.location ?? "").toLowerCase();
-
-      const matchesSearch =
-        !query || text.includes(query);
-
-      const matchesLocation =
-        !place || jobLocation.includes(place);
-
-      const matchesWorkplace =
-        workplace === "all" ||
-        (workplace === "remote" &&
-          jobLocation.includes("remote")) ||
-        (workplace === "hybrid" &&
-          jobLocation.includes("hybrid")) ||
-        (workplace === "onsite" &&
-          !jobLocation.includes("remote") &&
-          !jobLocation.includes("hybrid"));
-
-      return (
-        matchesSearch &&
-        matchesLocation &&
-        matchesWorkplace
-      );
-    });
-  }, [jobs, search, location, workplace]);
-
-  // Save or remove a bookmarked job.
   async function toggleSave(jobId: string) {
-    if (!userId) {
-      window.location.href = "/login";
-      return;
-    }
-
-    if (busyId !== null) return;
-
+    if (!userId || !supabase) return router.push("/login?next=/jobs");
     setBusyId(jobId);
-    setMessage("");
-
-    const alreadySaved = savedIds.includes(jobId);
-
-    if (alreadySaved) {
-      const { error } = await supabase
-        .from("saved_jobs")
-        .delete()
-        .eq("user_id", userId)
-        .eq("job_id", jobId);
-
-      if (error) {
-        setMessage(
-          "Unable to remove bookmark: " + error.message
-        );
-      } else {
-        setSavedIds((current) =>
-          current.filter((id) => id !== jobId)
-        );
-        setMessage("Job removed from Saved Jobs.");
-      }
-    } else {
-      const { error } = await supabase
-        .from("saved_jobs")
-        .insert({
-          user_id: userId,
-          job_id: jobId,
-        });
-
-      if (error) {
-        setMessage("Unable to save job: " + error.message);
-      } else {
-        setSavedIds((current) => [...current, jobId]);
-        setMessage("Job saved successfully!");
-      }
-    }
-
+    const saved = savedIds.includes(jobId);
+    const { error } = saved
+      ? await supabase.from("saved_jobs").delete().eq("user_id", userId).eq("job_id", jobId)
+      : await supabase.from("saved_jobs").insert({ user_id: userId, job_id: jobId });
+    if (error) setMessage("Unable to update saved jobs.");
+    else setSavedIds((c) => (saved ? c.filter((id) => id !== jobId) : [...c, jobId]));
     setBusyId(null);
   }
 
-  // Create a draft application without submitting to employers.
   async function createDraft(jobId: string) {
-    if (!userId) {
-      window.location.href = "/login";
-      return;
-    }
-
-    if (!selectedResumeId) {
-      setMessage("Please upload and select a resume first.");
-      return;
-    }
-
-    if (draftBusyId !== null) return;
-
-    setDraftBusyId(jobId);
-    setMessage("");
-
+    if (!userId) return router.push("/login?next=/jobs");
+    if (!resumeId) return setMessage("Upload and select a resume first.");
+    setBusyId(jobId);
     try {
-      const response = await fetch("/api/applications", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "same-origin",
-        body: JSON.stringify({
-          jobId,
-          resumeId: selectedResumeId,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(
-          result.error ??
-            "Unable to create application draft."
-        );
-        return;
-      }
-
-      setMessage("Draft application created successfully!");
-
-      // Open the applications dashboard.
-      window.location.href = "/applications";
+      const r = await fetch("/api/applications", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ jobId, resumeId }) });
+      const body = await r.json();
+      if (!r.ok) return setMessage(body.error ?? "Unable to create application draft.");
+      router.push("/applications");
     } catch {
       setMessage("Network error. Please try again.");
     } finally {
-      setDraftBusyId(null);
+      setBusyId(null);
     }
   }
 
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const where = filters.country === WORLDWIDE ? "worldwide" : `in ${countryName(filters.country)}`;
+
   return (
-    <div style={{ }}>
-      {/* Hero section */}
-      <section
-        style={{
-          background:
-            "var(--aurora)",
-          color: "var(--text)",
-          padding: "48px 32px",
-          borderRadius: 16,
-          marginBottom: 28,
-        }}
-      >
-        <p
-          style={{
-            color: "var(--primary-strong)",
-            fontWeight: 700,
-          }}
-        >
-          TAVISHI CAREERS
-        </p>
-
-        <h1 style={{ fontSize: 38 }}>
-          Explore opportunities
-        </h1>
-
-        <p>
-          Search jobs, save opportunities, and prepare
-          application drafts with your resumes.
-        </p>
+    <div style={{ display: "grid", gap: 24 }}>
+      <section className="tc-hero">
+        <h1>Explore opportunities {where}</h1>
+        <p style={{ color: "var(--text-muted)", margin: 0 }}>Real openings from employer sources. Filter by location, workplace, salary, seniority and employment type.</p>
       </section>
 
-      {/* Job filters */}
-      <section
-        style={{
-          background: "white",
-          padding: 24,
-          border: "1px solid var(--border)",
-          borderRadius: 14,
-          marginBottom: 25,
-        }}
-      >
-        <h2>Find your next job</h2>
+      <SearchFilters value={filters} onChange={setFilters} />
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: 15,
-          }}
-        >
-          <label>
-            Job title or company
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="e.g. SOC Analyst"
-              style={inputStyle}
-            />
-          </label>
+      {userId && (
+        <label className="tc-field" style={{ maxWidth: 360, margin: 0 }}>
+          <span>Resume for drafts</span>
+          <select value={resumeId} onChange={(e) => setResumeId(e.target.value)}>
+            {resumes.length === 0 && <option value="">No resumes uploaded</option>}
+            {resumes.map((r) => <option key={r.id} value={r.id}>{r.filename}</option>)}
+          </select>
+        </label>
+      )}
 
-          <label>
-            Location
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. New York"
-              style={inputStyle}
-            />
-          </label>
-
-          <label>
-            Work arrangement
-            <select
-              value={workplace}
-              onChange={(e) => setWorkplace(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="all">
-                All arrangements
-              </option>
-              <option value="remote">
-                Remote
-              </option>
-              <option value="hybrid">
-                Hybrid
-              </option>
-              <option value="onsite">
-                Onsite
-              </option>
-            </select>
-          </label>
+      <section aria-live="polite" style={{ display: "grid", gap: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <h2 style={{ margin: 0 }}>Results</h2>
+          {!loading && <span className="tc-hint">{total.toLocaleString("en")} job{total === 1 ? "" : "s"}</span>}
         </div>
-      </section>
-
-      {/* Available jobs */}
-      <section>
-        <h2>Available Jobs</h2>
-
-        {message && (
-          <p role="status">{message}</p>
+        {message && <p role="status" className="tc-badge tc-tone-peach">{message}</p>}
+        {loading ? <div className="tc-card"><Skeleton lines={4} /></div>
+          : jobs.length === 0 ? (
+            <EmptyState title="No matching jobs yet"
+              body={filters.country === WORLDWIDE ? "No active jobs match these filters. Try removing a filter." : `No active jobs match in ${countryName(filters.country)}. Try Worldwide or remove a filter.`}
+              action={filters.country !== WORLDWIDE ? <button type="button" className="tc-btn tc-btn-secondary" onClick={() => setFilters({ ...filters, country: WORLDWIDE, page: 1 })}>Search worldwide</button> : undefined} />
+          ) : jobs.map((job) => (
+            <JobCard key={job.id} job={job} saved={savedIds.includes(job.id)} busy={busyId === job.id}
+              onSave={() => toggleSave(job.id)} onDraft={() => createDraft(job.id)} />
+          ))}
+        {pages > 1 && (
+          <nav aria-label="Pagination" style={{ display: "flex", gap: 12, justifyContent: "center", alignItems: "center" }}>
+            <button type="button" className="tc-btn tc-btn-secondary" disabled={filters.page <= 1} onClick={() => setFilters({ ...filters, page: filters.page - 1 })}>Previous</button>
+            <span className="tc-hint">Page {filters.page} of {pages}</span>
+            <button type="button" className="tc-btn tc-btn-secondary" disabled={filters.page >= pages} onClick={() => setFilters({ ...filters, page: filters.page + 1 })}>Next</button>
+          </nav>
         )}
-
-        <p>
-          {loading
-            ? "Loading jobs..."
-            : `${filteredJobs.length} results`}
-        </p>
-
-        {!loading && filteredJobs.length === 0 && (
-          <p>
-            No jobs found. Your database may be empty,
-            or your filters may be too restrictive.
-          </p>
-        )}
-
-        <div style={{ display: "grid", gap: 16 }}>
-          {filteredJobs.map((job) => {
-            const saved = savedIds.includes(job.id);
-
-            return (
-              <article
-                key={job.id}
-                style={{
-                  background: "white",
-                  border: "1px solid var(--border)",
-                  borderRadius: 14,
-                  padding: 25,
-                }}
-              >
-                <h3 style={{ fontSize: 23 }}>
-                  {job.title}
-                </h3>
-
-                <p
-                  style={{
-                    color: "var(--primary-strong)",
-                    fontWeight: 700,
-                  }}
-                >
-                  {job.company}
-                </p>
-
-                <p>
-                  📍 {job.location || "Not specified"}
-                </p>
-
-                <p style={{ lineHeight: 1.7 }}>
-                  {job.description ||
-                    "No description available."}
-                </p>
-
-                {/* Bookmark button */}
-                <button
-                  type="button"
-                  onClick={() => toggleSave(job.id)}
-                  disabled={
-                    busyId !== null ||
-                    draftBusyId !== null
-                  }
-                  style={buttonStyle}
-                >
-                  {busyId === job.id
-                    ? "Please wait..."
-                    : saved
-                      ? "★ Remove Saved Job"
-                      : "☆ Save Job"}
-                </button>
-
-                {/* Resume selection and draft creation */}
-                <div
-                  style={{
-                    marginTop: 20,
-                    paddingTop: 18,
-                    borderTop: "1px solid var(--border)",
-                  }}
-                >
-                  <label
-                    htmlFor={`resume-${job.id}`}
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Choose resume for application
-                  </label>
-
-                  {!userId ? (
-                    <p>
-                      <a href="/login">
-                        Sign in to create application drafts →
-                      </a>
-                    </p>
-                  ) : resumes.length === 0 ? (
-                    <p>
-                      No resumes uploaded.{" "}
-                      <a href="/resumes">
-                        Upload a resume →
-                      </a>
-                    </p>
-                  ) : (
-                    <>
-                      <select
-                        id={`resume-${job.id}`}
-                        value={selectedResumeId}
-                        onChange={(event) =>
-                          setSelectedResumeId(
-                            event.target.value
-                          )
-                        }
-                        style={{
-                          ...inputStyle,
-                          marginBottom: 12,
-                        }}
-                      >
-                        {resumes.map((resume) => (
-                          <option
-                            key={resume.id}
-                            value={resume.id}
-                          >
-                            {resume.filename}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          createDraft(job.id)
-                        }
-                        disabled={
-                          draftBusyId !== null ||
-                          busyId !== null ||
-                          !selectedResumeId
-                        }
-                        style={buttonStyle}
-                      >
-                        {draftBusyId === job.id
-                          ? "Creating Draft..."
-                          : "Create Draft Application"}
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Existing external application link */}
-                {job.apply_url && (
-                  <p style={{ marginTop: 18 }}>
-                    <a
-                      href={job.apply_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open application ↗
-                    </a>
-                  </p>
-                )}
-              </article>
-            );
-          })}
-        </div>
       </section>
-
-      <p style={{ marginTop: 25 }}>
-        <a href="/dashboard">
-          ← Back to Dashboard
-        </a>
-      </p>
     </div>
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  boxSizing: "border-box",
-  marginTop: 8,
-  padding: 13,
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  background: "white",
-  color: "var(--text)",
-};
-
-const buttonStyle: React.CSSProperties = {
-  background: "var(--primary-strong)",
-  color: "white",
-  border: "none",
-  borderRadius: 8,
-  padding: "12px 22px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
+export default function JobsPage() {
+  return <Suspense fallback={<Skeleton lines={4} />}><JobsInner /></Suspense>;
+}
