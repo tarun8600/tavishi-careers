@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.mjs",
     "dev:config": "node scripts/start-with-config.mjs --profile dev --mode dev",
     "qa:build": "node scripts/start-with-config.mjs --profile qa --mode build",
     "prod:build": "node scripts/start-with-config.mjs --profile prod --mode build",
