@@ -6,6 +6,8 @@ Prioritized by dependency → security → correctness → product value. Each f
 |---|---------|-----------|--------|------------------------|
 | F1 | Infisical cloud configuration (PR #2) | – | ✅ | Six vars validated before start; missing names listed, never values; DEV/QA/PROD separate; local→cloud fallback; node:test suite |
 | F2 | CI + roadmap + lint | F1 | 🚧 | GitHub Actions runs lint, typecheck, test, build on push/PR |
+| F21 | Design-system foundation (Tavishi Aurora Light tokens + shared components app-wide) — see DESIGN_SPEC.md | F1 | 🚧 | Tokens in CSS; components in `src/components/ui`; all pages use layout/nav; contrast tests |
+| F22 | Global location: country selector (default US; Worldwide, IN, CA, GB, AU, DE, all ISO), international records preserved | F4 | ⏳ | Country list + default unit tests; jobs keep original country/currency |
 | F3 | Supabase SSR auth, Google OAuth, profile onboarding | F2 | 🚧 | Middleware refreshes session; protected routes redirect to /login; safe `next` redirect; profile validation tests; profile API upserts own row only |
 | F4 | Worldwide job schema + search filters | F2 | ⏳ | Country, city, remote/hybrid/onsite, salary min/max+currency, seniority, employment type; filter parser unit tests; indexed queries |
 | F5 | Multiple resumes + secure uploads | F3 | ⏳ | Private Storage bucket, per-user path RLS, MIME/size validation (PDF/DOCX ≤5 MB), signed URLs, delete own only |
@@ -22,5 +24,15 @@ Prioritized by dependency → security → correctness → product value. Each f
 | F16 | Admin tools | F6 | ⏳ | Role-based admin (not shared secret); source management, ingestion logs |
 | F17 | Responsive dashboards (reuse `feature/dashboard-ui`) | F14 | ⏳ | Mobile/desktop layouts; integrate preserved dashboard branch |
 | F18 | Tsenta-inspired UI with original Tavishi branding | F17 | ⏳ | Design system (tokens, components); original logo/colors/copy; no copied assets |
+| F23 | AI tailoring, cover letters, question drafting, résumé change diff/review | F11 | ⏳ | Diff renderer tests; nothing used until user approves |
+| F24 | Bulk preparation with per-submission or approved-batch authorization | F12 | ⏳ | Batch approval record; no submission outside approved set |
+| F25 | Recruiter responses, interview status, follow-up reminders | F14 | ⏳ | Status history + reminder scheduling tests |
+| F26 | Future integrations: email (optional, drafts only), browser extension, mobile, agent/MCP | F13 | ⏳ | Separate designs; owner approval per integration |
 | F19 | Health endpoint + monitoring | deployment | ⛔ | `/api/health` (no secrets); uptime checks + alerts once a public staging URL exists |
 | F20 | Staging deployment | owner approval | ⛔ | Requires approval (hosting, possibly paid) |
+
+## Permanent requirements (owner, 2026-10-24)
+- Functional parity targets: docs/FEATURE_PARITY.md. Original light-only design: docs/DESIGN_SPEC.md (do not copy Tsenta).
+- Worldwide; default country United States; all industries, levels and arrangements; preserve international records.
+- Real Supabase data only; never fictitious jobs, employers, applications or match %. Never claim a capability works until built and tested.
+- Order: F1 → F2 → F21 (design foundation) → F3 → F4/F22 → …
