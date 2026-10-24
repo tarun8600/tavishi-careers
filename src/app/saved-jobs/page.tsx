@@ -102,16 +102,16 @@ export default function SavedJobsPage() {
   }
 
   if (loading) {
-    return <main style={{ padding: 40 }}>Loading saved jobs...</main>;
+    return <div style={{ padding: 40 }}>Loading saved jobs...</div>;
   }
 
   return (
-    <main
+    <div
       style={{
         maxWidth: 950,
         margin: "40px auto",
         padding: 24,
-        fontFamily: "Arial, sans-serif",
+        
       }}
     >
       <a href="/dashboard">← Back to Dashboard</a>
@@ -127,7 +127,7 @@ export default function SavedJobsPage() {
             background: "white",
             padding: 30,
             borderRadius: 12,
-            border: "1px solid #dce3ed",
+            border: "1px solid var(--border)",
           }}
         >
           <h2>No saved jobs yet</h2>
@@ -143,7 +143,7 @@ export default function SavedJobsPage() {
                 background: "white",
                 padding: 24,
                 borderRadius: 12,
-                border: "1px solid #dce3ed",
+                border: "1px solid var(--border)",
               }}
             >
               <h2>
@@ -177,7 +177,7 @@ export default function SavedJobsPage() {
                 disabled={busyId !== ""}
                 onClick={() => removeJob(saved.job_id)}
                 style={{
-                  background: "#155a91",
+                  background: "var(--primary-strong)",
                   color: "white",
                   padding: "10px 18px",
                   border: "none",
@@ -193,6 +193,6 @@ export default function SavedJobsPage() {
           ))}
         </div>
       )}
-    </main>
+    </div>
   );
 }

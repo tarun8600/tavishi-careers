@@ -51,3 +51,15 @@ button{font:inherit}
 @keyframes tc-shimmer{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:768px){h1{font-size:1.75rem}.tc-hero{padding:1.5rem}}
+
+/* Base element theming so every page inherits Aurora Light */
+main button:not(.tc-btn){min-height:40px;padding:0 1rem;border-radius:var(--r-pill);border:1px solid var(--border-strong);background:var(--surface);color:var(--primary-strong);font-weight:600;cursor:pointer;transition:background .18s var(--ease),box-shadow .18s var(--ease)}
+main button:not(.tc-btn):hover:not(:disabled){background:var(--primary-light);box-shadow:var(--shadow-1)}
+main button[type="submit"]:not(.tc-btn){background:var(--primary-strong);color:#fff;border-color:transparent}
+main button:disabled{opacity:.55;cursor:not-allowed}
+main table{width:100%;border-collapse:separate;border-spacing:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+main th{background:var(--primary-light);color:var(--primary-strong);text-align:left;font-weight:600;padding:.7rem .9rem}
+main td{padding:.7rem .9rem;border-top:1px solid var(--border)}
+main section,main article{border-radius:var(--r-md)}
+main label{font-weight:500}
+main hr{border:0;border-top:1px solid var(--border)}

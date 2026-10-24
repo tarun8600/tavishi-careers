@@ -46,7 +46,7 @@ function OnboardingForm() {
     <label style={{ display: "block", marginBottom: 12 }}>
       {label}
       <input name={name} value={form[name]} placeholder={placeholder} onChange={(e) => setForm({ ...form, [name]: e.target.value })} style={{ display: "block", width: "100%", padding: 8 }} />
-      {errors[name] && <small role="alert" style={{ color: "#b42318" }}>{errors[name]}</small>}
+      {errors[name] && <small role="alert" style={{ color: "var(--danger)" }}>{errors[name]}</small>}
     </label>
   );
 

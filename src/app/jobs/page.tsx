@@ -271,13 +271,13 @@ export default function Jobs() {
   }
 
   return (
-    <main style={{ fontFamily: "Arial, sans-serif" }}>
+    <div style={{ }}>
       {/* Hero section */}
       <section
         style={{
           background:
-            "linear-gradient(135deg, #10233f, #155a91)",
-          color: "white",
+            "var(--aurora)",
+          color: "var(--text)",
           padding: "48px 32px",
           borderRadius: 16,
           marginBottom: 28,
@@ -285,7 +285,7 @@ export default function Jobs() {
       >
         <p
           style={{
-            color: "#a9d9ff",
+            color: "var(--primary-strong)",
             fontWeight: 700,
           }}
         >
@@ -307,7 +307,7 @@ export default function Jobs() {
         style={{
           background: "white",
           padding: 24,
-          border: "1px solid #dce3ed",
+          border: "1px solid var(--border)",
           borderRadius: 14,
           marginBottom: 25,
         }}
@@ -396,7 +396,7 @@ export default function Jobs() {
                 key={job.id}
                 style={{
                   background: "white",
-                  border: "1px solid #dce3ed",
+                  border: "1px solid var(--border)",
                   borderRadius: 14,
                   padding: 25,
                 }}
@@ -407,7 +407,7 @@ export default function Jobs() {
 
                 <p
                   style={{
-                    color: "#155a91",
+                    color: "var(--primary-strong)",
                     fontWeight: 700,
                   }}
                 >
@@ -445,7 +445,7 @@ export default function Jobs() {
                   style={{
                     marginTop: 20,
                     paddingTop: 18,
-                    borderTop: "1px solid #dce3ed",
+                    borderTop: "1px solid var(--border)",
                   }}
                 >
                   <label
@@ -540,7 +540,7 @@ export default function Jobs() {
           ← Back to Dashboard
         </a>
       </p>
-    </main>
+    </div>
   );
 }
 
@@ -550,14 +550,14 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   marginTop: 8,
   padding: 13,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--border)",
   borderRadius: 8,
   background: "white",
-  color: "#10233f",
+  color: "var(--text)",
 };
 
 const buttonStyle: React.CSSProperties = {
-  background: "#155a91",
+  background: "var(--primary-strong)",
   color: "white",
   border: "none",
   borderRadius: 8,

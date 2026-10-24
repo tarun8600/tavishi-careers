@@ -95,16 +95,16 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return <main style={{ padding: 40 }}>Loading profile...</main>;
+    return <div style={{ padding: 40 }}>Loading profile...</div>;
   }
 
   return (
-    <main
+    <div
       style={{
         maxWidth: 700,
         margin: "40px auto",
         padding: 24,
-        fontFamily: "Arial, sans-serif",
+        
       }}
     >
       <a href="/dashboard">← Back to Dashboard</a>
@@ -154,7 +154,7 @@ export default function ProfilePage() {
           disabled={saving}
           style={{
             padding: "12px 24px",
-            background: "#155e95",
+            background: "var(--primary-strong)",
             color: "white",
             border: "none",
             borderRadius: 8,
@@ -166,7 +166,7 @@ export default function ProfilePage() {
       </form>
 
       {message && <p role="status">{message}</p>}
-    </main>
+    </div>
   );
 }
 
@@ -176,7 +176,7 @@ const inputStyle: React.CSSProperties = {
   padding: 12,
   marginTop: 8,
   marginBottom: 22,
-  border: "1px solid #ccc",
+  border: "1px solid var(--border)",
   borderRadius: 8,
   boxSizing: "border-box",
 };
