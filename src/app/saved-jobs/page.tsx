@@ -117,7 +117,7 @@ export default function SavedJobsPage() {
       <a href="/dashboard">← Back to Dashboard</a>
 
       <h1>Saved Jobs</h1>
-      <p>Manage the job opportunities you've bookmarked.</p>
+      <p>Manage the job opportunities you&apos;ve bookmarked.</p>
 
       {message && <p role="status">{message}</p>}
 
