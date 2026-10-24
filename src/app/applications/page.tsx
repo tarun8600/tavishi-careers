@@ -687,7 +687,7 @@ export default function ApplicationsPage() {
                       </div>
                     ) : (
                       <p>
-                        This application's current status
+                        This application&apos;s current status
                         is{" "}
                         <strong>
                           {application.status.replaceAll(
