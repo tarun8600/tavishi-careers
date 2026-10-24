@@ -191,16 +191,16 @@ export default function ResumesPage() {
   }
 
   if (loading) {
-    return <main style={{ padding: 40 }}>Loading resumes...</main>;
+    return <div style={{ padding: 40 }}>Loading resumes...</div>;
   }
 
   return (
-    <main
+    <div
       style={{
         maxWidth: 800,
         margin: "40px auto",
         padding: 24,
-        fontFamily: "Arial, sans-serif",
+        
       }}
     >
       <a href="/dashboard">← Back to Dashboard</a>
@@ -211,7 +211,7 @@ export default function ResumesPage() {
         style={{
           background: "white",
           padding: 24,
-          border: "1px solid #dce3ed",
+          border: "1px solid var(--border)",
           borderRadius: 12,
           marginBottom: 24,
         }}
@@ -235,7 +235,7 @@ export default function ResumesPage() {
             display: "block",
             marginTop: 18,
             padding: "12px 20px",
-            background: "#155e95",
+            background: "var(--primary-strong)",
             color: "white",
             border: "none",
             borderRadius: 8,
@@ -257,7 +257,7 @@ export default function ResumesPage() {
               key={resume.id}
               style={{
                 padding: 18,
-                border: "1px solid #dce3ed",
+                border: "1px solid var(--border)",
                 borderRadius: 10,
                 background: "white",
               }}
@@ -285,6 +285,6 @@ export default function ResumesPage() {
       )}
 
       {message && <p role="status">{message}</p>}
-    </main>
+    </div>
   );
 }

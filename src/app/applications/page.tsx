@@ -317,17 +317,17 @@ export default function ApplicationsPage() {
   }
 
   return (
-    <main
+    <div
       style={{
         maxWidth: 950,
         margin: "40px auto",
         padding: 24,
-        fontFamily: "Arial, sans-serif",
+        
       }}
     >
       <a href="/dashboard">← Back to Dashboard</a>
 
-      <h1 style={{ color: "#10233f" }}>
+      <h1 style={{ color: "var(--text)" }}>
         My Applications
       </h1>
 
@@ -337,7 +337,7 @@ export default function ApplicationsPage() {
         <p
           role="status"
           style={{
-            background: "#eef4ff",
+            background: "var(--sky)",
             padding: 14,
             borderRadius: 8,
           }}
@@ -376,7 +376,7 @@ export default function ApplicationsPage() {
                 key={application.id}
                 style={cardStyle}
               >
-                <h2 style={{ color: "#10233f" }}>
+                <h2 style={{ color: "var(--text)" }}>
                   {application.jobs?.title ??
                     "Unavailable Job"}
                 </h2>
@@ -405,10 +405,10 @@ export default function ApplicationsPage() {
                   <strong
                     style={{
                       color: isApproved
-                        ? "#067647"
+                        ? "var(--primary-strong)"
                         : application.status === "withdrawn"
-                          ? "#b42318"
-                          : "#10233f",
+                          ? "var(--danger)"
+                          : "var(--text)",
                       textTransform: "capitalize",
                     }}
                   >
@@ -452,8 +452,8 @@ export default function ApplicationsPage() {
                     style={{
                       marginTop: 24,
                       padding: 20,
-                      background: "#f4f7fb",
-                      border: "1px solid #dce3ed",
+                      background: "var(--sky)",
+                      border: "1px solid var(--border)",
                       borderRadius: 10,
                     }}
                   >
@@ -501,7 +501,7 @@ export default function ApplicationsPage() {
                         style={{
                           background: "white",
                           padding: 20,
-                          border: "1px solid #dce3ed",
+                          border: "1px solid var(--border)",
                           borderRadius: 10,
                         }}
                       >
@@ -612,7 +612,7 @@ export default function ApplicationsPage() {
                           }
                           style={{
                             ...buttonStyle,
-                            background: "#067647",
+                            background: "var(--primary-strong)",
                           }}
                         >
                           {isBusy
@@ -649,7 +649,7 @@ export default function ApplicationsPage() {
                           }
                           style={{
                             ...buttonStyle,
-                            background: "#b42318",
+                            background: "var(--danger)",
                           }}
                         >
                           {isBusy
@@ -660,13 +660,13 @@ export default function ApplicationsPage() {
                     ) : isApproved ? (
                       <div
                         style={{
-                          background: "#ecfdf3",
+                          background: "var(--primary-light)",
                           padding: 20,
-                          border: "1px solid #abefc6",
+                          border: "1px solid var(--primary-light)",
                           borderRadius: 10,
                         }}
                       >
-                        <h3 style={{ color: "#067647" }}>
+                        <h3 style={{ color: "var(--primary-strong)" }}>
                           Application Approved
                         </h3>
 
@@ -687,7 +687,7 @@ export default function ApplicationsPage() {
                       </div>
                     ) : (
                       <p>
-                        This application's current status
+                        This application&apos;s current status
                         is{" "}
                         <strong>
                           {application.status.replaceAll(
@@ -716,7 +716,7 @@ export default function ApplicationsPage() {
       <p style={{ marginTop: 30 }}>
         <a href="/jobs">Explore More Jobs →</a>
       </p>
-    </main>
+    </div>
   );
 }
 
@@ -724,11 +724,11 @@ const cardStyle: React.CSSProperties = {
   background: "white",
   padding: 24,
   borderRadius: 12,
-  border: "1px solid #dce3ed",
+  border: "1px solid var(--border)",
 };
 
 const buttonStyle: React.CSSProperties = {
-  background: "#155a91",
+  background: "var(--primary-strong)",
   color: "white",
   border: "none",
   borderRadius: 8,
@@ -742,14 +742,14 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   padding: 12,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--border)",
   borderRadius: 8,
   background: "white",
-  color: "#10233f",
+  color: "var(--text)",
 };
 
 const dividerStyle: React.CSSProperties = {
   border: 0,
-  borderTop: "1px solid #dce3ed",
+  borderTop: "1px solid var(--border)",
   margin: "24px 0",
 };

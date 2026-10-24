@@ -36,11 +36,11 @@ export default function DashboardPage() {
   }
 
   if (loading) {
-    return <main><p>Checking your account...</p></main>;
+    return <div><p>Checking your account...</p></div>;
   }
 
   return (
-    <main style={{ maxWidth: 900, margin: "40px auto" }}>
+    <div style={{ maxWidth: 900, margin: "40px auto" }}>
       <h1>Welcome to Tavishi Careers!</h1>
 
       <p>
@@ -66,7 +66,7 @@ export default function DashboardPage() {
   style={{
     background: "white",
     padding: 25,
-    border: "1px solid #dce3ed",
+    border: "1px solid var(--border)",
     borderRadius: 12,
   }}
 >
@@ -80,7 +80,7 @@ export default function DashboardPage() {
         display: "inline-block",
         marginTop: 10,
         padding: "10px 16px",
-        background: "#155e95",
+        background: "var(--primary-strong)",
         color: "white",
         borderRadius: 8,
         textDecoration: "none",
@@ -96,7 +96,7 @@ export default function DashboardPage() {
       display: "inline-block",
       marginTop: 10,
       padding: "10px 16px",
-      background: "#155e95",
+      background: "var(--primary-strong)",
       color: "white",
       borderRadius: 8,
       textDecoration: "none",
@@ -112,7 +112,7 @@ export default function DashboardPage() {
       display: "inline-block",
       marginTop: 10,
       padding: "10px 16px",
-      background: "#155e95",
+      background: "var(--primary-strong)",
       color: "white",
       borderRadius: 8,
       textDecoration: "none",
@@ -128,7 +128,7 @@ export default function DashboardPage() {
       display: "inline-block",
       marginTop: 10,
       padding: "10px 16px",
-      background: "#155e95",
+      background: "var(--primary-strong)",
       color: "white",
       borderRadius: 8,
       textDecoration: "none",
@@ -151,7 +151,7 @@ export default function DashboardPage() {
         onClick={handleLogout}
         style={{
           marginTop: 30,
-          background: "#155a91",
+          background: "var(--primary-strong)",
           color: "white",
           padding: "12px 22px",
           border: "none",
@@ -161,6 +161,6 @@ export default function DashboardPage() {
       >
         Sign Out
       </button>
-    </main>
+    </div>
   );
 }
